@@ -44,6 +44,39 @@ class SafeLocalGameExitTests(unittest.TestCase):
             self.assertNotIn("SECRET_SESSION_TOKEN", result)
             self.assertNotIn("TEST_PRIVATE_VALUE", result)
 
+    def test_realistic_game_ping_no_pong_is_counted_without_raw_user(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            logs = root / "channel1_core1" / "log"
+            logs.mkdir(parents=True)
+            (logs / "syslog").write_text(
+                "PING_EVENT: no pong PRIVATE_USER_DEVICE_NAME\\n"
+                "SYSTEM: closing socket. DESC #88\\n"
+                "SEQUENCE 0xfee mismatch 0xff != 0x12 header 254\\n"
+                "PONG! 1 12\\n".replace("\\n", "\n"),
+                encoding="utf-8",
+            )
+            counts = safe_log_counts(root)["recentLogCategoryCounts"]
+            self.assertEqual(counts["game_ping_no_pong"], 1)
+            self.assertEqual(counts["game_timeout"], 1)
+            self.assertEqual(counts["game_session_socket_closed"], 1)
+            self.assertEqual(counts["game_sequence_mismatch"], 1)
+            self.assertEqual(counts["game_pong_received"], 1)
+            self.assertNotIn("PRIVATE_USER_DEVICE_NAME", json.dumps(counts))
+
+    def test_duplicate_login_and_handshake_categories(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "logs").mkdir()
+            (root / "logs" / "channel1_core1.out").write_text(
+                "DisconnectOfSameLogin SECRET_ACCOUNT\\n"
+                "handshake retry limit reached! SECRET_PLAYER\\n".replace("\\n", "\n")
+            )
+            info = safe_log_counts(root)
+            self.assertEqual(info["recentLogCategoryCounts"]["game_duplicate_login"], 1)
+            self.assertEqual(info["recentLogCategoryCounts"]["game_handshake_rejected"], 1)
+            self.assertNotIn("SECRET_PLAYER", json.dumps(info))
+
     def test_no_logs_have_no_invented_events(self):
         with tempfile.TemporaryDirectory() as temp:
             info = safe_log_counts(temp)
