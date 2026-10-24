@@ -23,6 +23,8 @@ CATEGORIES = {
     "game_duplicate_login": r"(?:same\s*login|different\s*computer|duplicate\s*login|DisconnectOfSameLogin)",
     "game_session_socket_closed": r"SYSTEM\s*:\s*closing\s+socket",
     "game_handshake_rejected": r"(?:invalid\s+handshake|handshake\s+retry\s+limit)",
+    "game_client_version_rejected": r"(?:VERSION_CONFLICT|client version[^\\n]{0,80}(?:mismatch|wrong)|incorrect client version)",
+    "game_server_phase_close": r"(?:SetPhase\\s*\\(\\s*PHASE_CLOSE|PHASE_CLOSE)",
     "game_process_fault": r"(?:segmentation fault|sigsegv|core dumped|fatal error|abort(?:ed)?|assertion failed)",
     "game_disconnect": r"(?:disconnect|disconnected|connection closed|close socket|close desc|connection reset)",
     "game_timeout": r"(?:timed?[\s_-]*out|no ping|no pong|ping timeout|heartbeat|keepalive)",
@@ -64,21 +66,40 @@ def safe_log_counts(runtime):
     root = Path(runtime).expanduser()
     # Avoid recursive scans and path traversal. Only known local log slots.
     relative = (
-        "logs/channel1_core1.out", "channel1_core1/syserr",
-        "channel1_core1/syslog", "logs/auth.out",
-        "channel1_core1/log/syslog", "channel1_core1/log/syserr"
+        # Source-exact paths from Cemreefe native_runtime_stage.py.
+        # CWD/syslog.log and CWD/syserr.log are symlinks to these canonical
+        # files; inspect targets directly (never follow symlinks).
+        "logs/channel1_core1.syslog.log",
+        "logs/channel1_core1.syserr.log",
+        "logs/channel1_core1.out",
+        "channel1_core1/stdout",
+        "channel1_core1/stderr",
+        # AUTH may explain same-login disconnects; keep separate counts.
+        "logs/auth.syslog.log",
+        "logs/auth.syserr.log",
+        "logs/auth.out",
     )
     counts = dict.fromkeys(CATEGORIES, 0)
-    files_examined = 0
+    game_counts = dict.fromkeys(CATEGORIES, 0)
+    auth_counts = dict.fromkeys(CATEGORIES, 0)
+    examined = []
     for name in relative:
         tail = _safe_tail(root / name)
         if tail is None:
             continue
-        files_examined += 1
+        examined.append(name)
+        own_counts = auth_counts if name.startswith("logs/auth.") else game_counts
         for kind, expression in CATEGORIES.items():
-            counts[kind] += len(re.findall(expression, tail, re.IGNORECASE))
-    return {"filesExamined": files_examined,
+            found = len(re.findall(expression, tail, re.IGNORECASE))
+            counts[kind] += found
+            own_counts[kind] += found
+    return {"filesExamined": len(examined),
+            "knownLogFilesExamined": examined,
             "recentLogCategoryCounts": counts,
+            "recentGameLogCategoryCounts": game_counts,
+            "recentAuthLogCategoryCounts": auth_counts,
+            "gameLogsFound": any(x.startswith("logs/channel1_core1.") or
+                                 x.startswith("channel1_core1/") for x in examined),
             "logTailWindowBytesPerFile": 65536,
             "rawServerLogIncluded": False}
 
