@@ -122,6 +122,67 @@ class SafeLocalGameExitTests(unittest.TestCase):
         self.assertTrue(signals["possibleSequenceMismatch"])
         self.assertFalse(signals["possibleDuplicateLogin"])
 
+    def test_real_runtime_staged_canonical_game_log_targets(self):
+        # native_runtime_stage.py links CWD syslog.log/syserr.log
+        # to canonical logs/channel1_core1.{syslog,syserr}.log.
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            logs = root / "logs"
+            logs.mkdir()
+            game = root / "channel1_core1"
+            game.mkdir()
+            (logs / "channel1_core1.syslog.log").write_text(
+                "PING_EVENT: no pong FAKE_PRIVATE_PLAYER_SECRET\n"
+                "SYSTEM: closing socket. DESC #19\n"
+            )
+            (logs / "channel1_core1.syserr.log").write_text(
+                "SEQUENCE cafe mismatch 0xff != 0x01 header 254\n"
+            )
+            (game / "stdout").write_text(
+                "VERSION_CONFLICT TEST_PRIVATE_CHARACTER\n"
+            )
+            (logs / "auth.out").write_text(
+                "duplicate login TEST_PRIVATE_ACCOUNT\n"
+            )
+            report = safe_log_counts(root)
+            self.assertEqual(report["filesExamined"], 4)
+            self.assertTrue(report["gameLogsFound"])
+            self.assertEqual(
+                report["recentGameLogCategoryCounts"]["game_ping_no_pong"], 1
+            )
+            self.assertEqual(
+                report["recentGameLogCategoryCounts"]["game_sequence_mismatch"], 1
+            )
+            self.assertEqual(
+                report["recentGameLogCategoryCounts"]["game_client_version_rejected"], 1
+            )
+            self.assertEqual(
+                report["recentGameLogCategoryCounts"]["game_session_socket_closed"], 1
+            )
+            self.assertEqual(
+                report["recentAuthLogCategoryCounts"]["game_duplicate_login"], 1
+            )
+            safe = json.dumps(report)
+            for secret in ("FAKE_PRIVATE_PLAYER_SECRET",
+                           "TEST_PRIVATE_CHARACTER", "TEST_PRIVATE_ACCOUNT"):
+                self.assertNotIn(secret, safe)
+            self.assertIn("logs/channel1_core1.syslog.log",
+                          report["knownLogFilesExamined"])
+            self.assertIn("logs/channel1_core1.syserr.log",
+                          report["knownLogFilesExamined"])
+
+    def test_invalid_phase_close_and_version_signatures(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "logs").mkdir()
+            (root / "logs" / "channel1_core1.syserr.log").write_text(
+                "SetPhase ( PHASE_CLOSE ) account=HIDDEN\n"
+                "client version mismatch account=HIDDEN\n"
+            )
+            found = safe_log_counts(root)["recentGameLogCategoryCounts"]
+            self.assertEqual(found["game_server_phase_close"], 1)
+            self.assertEqual(found["game_client_version_rejected"], 1)
+
     def test_no_logs_have_no_invented_events(self):
         with tempfile.TemporaryDirectory() as temp:
             info = safe_log_counts(temp)
