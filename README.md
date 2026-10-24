@@ -69,6 +69,14 @@ python3 -m protocol_lab.game_exit \
 - `game_listener_stopped_after_eof`: GAME portu kapalı;
   servis durmuş veya çökmüş olabilir.
 
+Yeni özellikle `game_ping_no_pong`, `game_pong_received`,
+`game_sequence_mismatch`, `game_duplicate_login`,
+`game_handshake_rejected` ve `game_session_socket_closed` sayaçlarına
+bakılır. İncelenen açık kaynak sunucunun varsayılan PING süresi
+60 saniyedir; ancak telefonundaki GAME yapılandırması farklı olabilir.
+Sıfır değerleri yalnız taranan **log pencerelerinde** eşleşme olmadığını
+gösterir, PING sorunu olmadığını kesinleştirmez.
+
 `localServerLogs.recentLogCategoryCounts` yalnız son 64 KB logdaki
 hata anahtar sözcüklerinin **adetlerini** gösterir. Ham satırlar,
 karakter ismi, şifre, IP, token ve paket verileri hiçbir şekilde
