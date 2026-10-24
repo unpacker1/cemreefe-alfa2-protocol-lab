@@ -135,14 +135,15 @@ def classify_peer(health, ports):
 def inspect(health, runtime):
     ports = safe_port_probe()
     safe = build_report(health)
+    logs = safe_log_counts(runtime)
     return {
         "schema": "public_protocol_lab_local_game_exit_v1",
         "classification": classify_peer(health, ports),
         "safeHealth": safe,
         "localPortsOpen": ports,
-        "localServerLogs": safe_log_counts(runtime),
+        "localServerLogs": logs,
         "localKeepaliveConfig": safe_keepalive_config(runtime),
-        "logSignalsUncorrelated": report_indicators(safe_log_counts(runtime)["recentLogCategoryCounts"]),
+        "logSignalsUncorrelated": report_indicators(logs["recentLogCategoryCounts"]),
         "note": "Log keyword counts may include earlier sessions; signals are NOT proven causes.",
     }
 
