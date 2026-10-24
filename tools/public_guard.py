@@ -18,6 +18,7 @@ ALLOW = {
     "src/protocol_lab/ws_v12.py", "src/protocol_lab/session.py",
     "src/protocol_lab/triage.py", "src/protocol_lab/game_exit.py",
     "src/protocol_lab/source_audit.py",
+    "src/protocol_lab/keepalive.py",
     "tests/test_gc.py", "tests/test_ws_session.py", "tests/test_triage.py",
     "tests/test_game_exit.py", "tests/test_source_audit.py",
     "tools/public_guard.py", "fixtures/observed_failure_types.synthetic.json",
