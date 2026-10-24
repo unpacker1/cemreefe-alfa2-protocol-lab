@@ -97,6 +97,31 @@ class GCRegression(unittest.TestCase):
             decoder.finish()
         self.assertEqual(ctx.exception.reason, "game_frame_incomplete")
 
+    def test_source_exact_game_ping_handshake_time_sync_sizes(self):
+        # Source: game/desc.cpp emits one-byte GC_PING, then 13-byte
+        # GC_HANDSHAKE. A successful time-sync may emit one-byte 0xfc.
+        ping = bytes((44,))
+        handshake = struct.pack("<BIIi", 255, 123456, 9876543, 0)
+        sync = bytes((252,))
+        point = struct.pack("<iIBii", 17, 42, 4, 300, 450)
+        data = ping + handshake + sync + point
+        decoder = IncrementalGCDecoder()
+        frames = decoder.feed(data)
+        self.assertEqual([x.opcode for x in frames], [44, 255, 252, 17])
+        self.assertEqual([x.wire_size for x in frames], [1, 13, 1, 17])
+        decoder.finish()
+
+    def test_fragmented_source_ping_handshake_never_becomes_fake_opcode(self):
+        data = bytes((44,)) + struct.pack("<BIIi", 255, 123, 345, 0)
+        data += struct.pack("<Bq", 106, 1760000000)
+        for split in range(len(data)+1):
+            with self.subTest(split=split):
+                decoder = IncrementalGCDecoder()
+                frames = decoder.feed(data[:split])
+                frames.extend(decoder.feed(data[split:]))
+                self.assertEqual([x.opcode for x in frames], [44, 255, 106])
+                decoder.finish()
+
     def test_bad_npc_count_is_invalid_frame_not_socket_error(self):
         p = struct.pack("<BHH", 115, 5 + 78 * 47, 18)
         with self.assertRaises(FrameError) as ctx:
