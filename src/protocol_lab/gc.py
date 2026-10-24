@@ -13,7 +13,8 @@ from struct import unpack_from
 # Only the cases verified in the project's synthetic regression set.
 # ARM64 time_t=8, so GC_TIME is *9*, not 5. 17 uses a 4-byte header.
 FIXED: dict[int, int] = {1: 35, 2: 5, 3: 24, 16: 1021,
-                          17: 17, 76: 2551, 106: 9, 114: 6}
+                          17: 17, 44: 1, 76: 2551, 106: 9, 114: 6,
+                          252: 1, 255: 13}
 MAX_FRAME = 65535
 MAX_BUFFER = 1_048_576
 
