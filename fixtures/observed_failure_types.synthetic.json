@@ -1,0 +1,11 @@
+{
+  "origin": "HAND_AUTHORED_SYNTHETIC_PROTOCOL_TEST_CASES",
+  "contains_real_game_data": false,
+  "cases": [
+    {"name": "gc_time_arm64", "opcode": 106, "wire_bytes": 9},
+    {"name": "gc_special_effect", "opcode": 114, "wire_bytes": 6},
+    {"name": "gc_npc_47", "opcode": 115, "count": 47, "wire_bytes": 3671},
+    {"name": "gc_land_18", "opcode": 130, "count": 18, "wire_bytes": 435},
+    {"name": "gc_point_change", "opcode": 17, "wire_bytes": 17}
+  ]
+}

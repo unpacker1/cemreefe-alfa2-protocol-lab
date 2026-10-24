@@ -1,0 +1,42 @@
+# Cemreefe ↔ Alfa2 Protocol Lab (PUBLIC, sanitized)
+
+**Temizden yazılmış protokol test laboratuvarı.** Orijinal oyunun istemcisi, sunucusu, motoru, veritabanı, hesapları, derlenmiş APK'si ve oyun modelleri burada **yoktur**.
+
+## Ne işe yarar?
+
+- Metin2-benzeri native GAME'in **şifresi çözülmüş** ikili paket sınırlarını test eder (gerçek DH2/Crypto++ kodu veya oyun ağı yok).
+- Belirli GAME `GC` protokol regresyonlarını üretir: GC106 **9 bayt**, GC114 **6 bayt**, GC115 **5 + 78 × kayıt**, GC130 **3 + 24 × kayıt**, GC17 **17 bayt**.
+- TCP parçalanması (veri 1 bayt veya rastgele iki parçaya ayrılsa da) ve eksik gövde/yanlış kayıt sayısı testleri yapar.
+- Alfa2 v12 `0x00` güvenilir MessagePack ve `0x01` hareket dizisi çerçeve sözleşmesini test eder.
+- `Welcome` ardından native oturum koparsa **tek kullanımlık GAME anahtarının** yeniden kullanılamayacağını taklit eder.
+- Python + C++ boyut denetimlerini Public GitHub Actions içinde ücretsiz standart runner'da çalıştırabilir.
+
+## Sınırlar
+
+Bu repo **gerçek DB/AUTH/GAME sunucusunu başlatmaz**. Oyun paketi, sıfırdan portlanmış oyun motoru, gerçek mob AI, gerçek saldırı, skill, eşya ve NPC mağazası bu depoda **yer almaz**. Buradaki paket boyutları bir kaynak sürümüne göre hazırlanmış regresyon sözleşmeleridir; gerçek fork farklı olabilir. Kendi orijinal dosyalarının doğrulamasını ayrı **Private** ortamda yap.
+
+## Termux / Linux yerel test
+
+```bash
+python3 -m pip install -e .
+python3 tools/public_guard.py .
+python3 -m unittest discover -s tests -v
+```
+
+C++ test (g++ varsa):
+
+```bash
+g++ -std=c++17 -Wall -Wextra -Werror -pedantic cpp/test_frame_contract.cpp -o /tmp/protocol_contract && /tmp/protocol_contract
+```
+
+GitHub Actions: `.github/workflows/protocol-ci.yml` — yalnız sentetik testler ve `contents: read` izni.
+
+## Private ↔ Public iş akışı
+
+1. Yeni GAME hatasını **Private cihazda** kaydet; hesap/token/paket verilerini yayımlama.
+2. Sadece **sayısal hata türü** ve **yapay baytlarla** tekrar üretilebilir regression testi yaz.
+3. Public PR/commit + Actions yeşil ise ilgili codec/test düzeltmesini dikkatlice Private koda **elle seçerek** aktar.
+4. Orijinal native GAME/Alfa2 ortamında yeniden derle ve telefon testini yap.
+5. Public depoya asla Private repodan `git push --mirror`, fork/transfer, `cp -a`, Git geçmişi veya orijinal ZIP/APK/SQL/GLB taşıma.
+
+Bkz. [MIGRATION.md](MIGRATION.md), [SECURITY.md](SECURITY.md), [STATUS.md](STATUS.md).
