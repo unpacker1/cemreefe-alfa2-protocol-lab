@@ -25,6 +25,7 @@ NUMBER_KEYS = (
     "nativeGamePingReceived", "nativeGamePongSent",
     "nativeGameHandshakeReceived", "nativeGameTimeSyncSent",
     "nativeGameTimeSyncAcknowledged",
+    "nativeGameSessionDurationSeconds",
 )
 REASONS = frozenset({
     "unsupported_live_opcode", "invalid_gc115_length",
