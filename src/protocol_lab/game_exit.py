@@ -83,6 +83,44 @@ def safe_log_counts(runtime):
             "rawServerLogIncluded": False}
 
 
+def safe_keepalive_config(runtime):
+    """Extract only a verified numeric GAME heartbeat setting, never CONFIG text."""
+    root = Path(runtime).expanduser()
+    path = root / "channel1_core1" / "CONFIG"
+    if path.is_symlink() or not path.is_file():
+        return {"serverPingIntervalSeconds": None,
+                "heartbeatConfigSource": "unavailable"}
+    try:
+        if path.stat().st_size > 131072:
+            return {"serverPingIntervalSeconds": None,
+                    "heartbeatConfigSource": "oversized_rejected"}
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return {"serverPingIntervalSeconds": None,
+                "heartbeatConfigSource": "unreadable"}
+    m = re.findall(
+        r"(?im)^\s*ping_event_second_cycle\s*[:=]?\s*(\d{1,4})\s*$",
+        text)
+    if len(m) == 1 and 5 <= int(m[0]) <= 3600:
+        return {"serverPingIntervalSeconds": int(m[0]),
+                "heartbeatConfigSource": "local_game_config"}
+    return {"serverPingIntervalSeconds": None,
+            "heartbeatConfigSource": "not_explicitly_configured"}
+
+
+def report_indicators(log_counts):
+    """Uncorrelated log signatures are hypotheses, not a definite kick cause."""
+    signals = {
+        "possibleNoPongDisconnect": "game_ping_no_pong",
+        "possibleSequenceMismatch": "game_sequence_mismatch",
+        "possibleDuplicateLogin": "game_duplicate_login",
+        "possibleHandshakeRejection": "game_handshake_rejected",
+        "possibleGameProcessFault": "game_process_fault",
+    }
+    return {label: log_counts.get(category, 0) > 0
+            for label, category in signals.items()}
+
+
 def classify_peer(health, ports):
     safe = build_report(health)
     if safe["classification"] != "native_peer_closed":
@@ -103,7 +141,9 @@ def inspect(health, runtime):
         "safeHealth": safe,
         "localPortsOpen": ports,
         "localServerLogs": safe_log_counts(runtime),
-        "note": "Log keyword counts are clues, not a confirmed kick/crash cause.",
+        "localKeepaliveConfig": safe_keepalive_config(runtime),
+        "logSignalsUncorrelated": report_indicators(safe_log_counts(runtime)["recentLogCategoryCounts"]),
+        "note": "Log keyword counts may include earlier sessions; signals are NOT proven causes.",
     }
 
 
