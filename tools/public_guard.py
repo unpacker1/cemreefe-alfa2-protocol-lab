@@ -16,7 +16,8 @@ ALLOW = {
     "cpp/frame_contract.hpp", "cpp/test_frame_contract.cpp",
     "src/protocol_lab/__init__.py", "src/protocol_lab/gc.py",
     "src/protocol_lab/ws_v12.py", "src/protocol_lab/session.py",
-    "tests/test_gc.py", "tests/test_ws_session.py",
+    "src/protocol_lab/triage.py",
+    "tests/test_gc.py", "tests/test_ws_session.py", "tests/test_triage.py",
     "tools/public_guard.py", "fixtures/observed_failure_types.synthetic.json",
 }
 
