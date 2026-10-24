@@ -84,8 +84,8 @@ class SafeLocalGameExitTests(unittest.TestCase):
             game = root / "channel1_core1"
             game.mkdir()
             (game / "CONFIG").write_text(
-                "DB_PASSWORD: NO_PRIVATE_PASSWORD_MAY_LEAK\\n"
-                "ping_event_second_cycle: 60\\n".replace("\\\\n", "\\n"),
+                "DB_PASSWORD: NO_PRIVATE_PASSWORD_MAY_LEAK" + chr(10)
+                + "ping_event_second_cycle: 60" + chr(10),
                 encoding="utf-8"
             )
             result = safe_keepalive_config(root)
