@@ -22,6 +22,9 @@ NUMBER_KEYS = (
     "nativeLandListPackets", "nativeLandListRecords",
     "nativeZeroHeaderCount", "nativeZeroAfterOpcode",
     "nativeSpecialEffectPackets", "nativeNpcPositionPacketsLive",
+    "nativeGamePingReceived", "nativeGamePongSent",
+    "nativeGameHandshakeReceived", "nativeGameTimeSyncSent",
+    "nativeGameTimeSyncAcknowledged",
 )
 REASONS = frozenset({
     "unsupported_live_opcode", "invalid_gc115_length",
