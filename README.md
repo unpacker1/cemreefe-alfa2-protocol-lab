@@ -23,6 +23,32 @@ python3 tools/public_guard.py .
 python3 -m unittest discover -s tests -v
 ```
 
+## Gerçek oturum hatasını güvenli biçimde sınıflandırma
+
+Bu araç yalnız **yerel** GAME köprüsünün `/api/health` çıktısını alır,
+içinden izin verilen tanı alanlarını seçer ve diğer her şeyi atar.
+**Ham JSON, paket dökümü, token, kullanıcı adı veya özel dosya yükleme.**
+
+Termux'ta Public repoyu güncelledikten sonra:
+
+```bash
+cd ~/cemreefe_alfa2_public_lab
+git pull --ff-only
+
+python3 - <<'PY'
+import json, urllib.request
+from protocol_lab.triage import build_report
+
+health=json.load(urllib.request.urlopen(
+    "http://127.0.0.1:8766/api/health",timeout=5))
+print(json.dumps(build_report(health),indent=2,ensure_ascii=False))
+PY
+```
+
+Sadece ekranda çıkan **safeSnapshot + classification** sonucunu
+incele. Ham API cevabını GitHub'a **commit etme**. Bu modül gerçek
+native sokete bağlanmaz, şifre çözmez ve oyun hesabını değiştirmez.
+
 C++ test (g++ varsa):
 
 ```bash
