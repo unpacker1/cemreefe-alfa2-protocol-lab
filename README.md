@@ -83,6 +83,37 @@ karakter ismi, şifre, IP, token ve paket verileri hiçbir şekilde
 çıktıya yazılmaz. Bu sayılar tek başına sunucunun gerçekten oyuncuyu
 attığını kanıtlamaz; daha ileri kaynak incelemesi Private yapılmalıdır.
 
+### 60 saniyelik native GAME PING / HANDSHAKE kontrolü
+
+Orijinal GAME kaynak kodunda sunucu istemciye periyodik **GC 44 PING**
+ve **GC 255 HANDSHAKE** gönderebilir; **GC 252 TIME_SYNC**
+onayını da işler. Bu paketler orijinal metin2 istemcisinde karşılanır.
+Public laboratuvarda çerçeve boyutu testleri eklenmiştir (1, 13, 1 bayt).
+Cevapların GAME tarafında doğru kabul edildiği ayrıca test edilmelidir.
+
+Yerel native kaynak kodunda canlı GAME dalı bunları tanıyor mu?
+
+```bash
+cd ~/cemreefe_alfa2_public_lab
+git pull --ff-only
+python3 -m protocol_lab.source_audit \
+  --native-root "$HOME/CEMREEFE_WEB_V1"
+python3 -m protocol_lab.game_exit \
+  --runtime "$HOME/CEMREEFE_NATIVE_STANDALONE/runtime"
+```
+
+`gameHandshakeGc255HandlerPresent=false`: canlı native okuyucuda
+bu kontrol mesajı için işleyici tespit edilemedi. Bu **kod kapsamı**
+eksikliğidir; bağlantının neden koptuğunu tek başına kanıtlamaz.
+
+`localServerLogs.recentLogCategoryCounts.game_ping_no_pong` ve
+`game_sequence_mismatch` sunucu kaynaklarında gerçek olarak kullanılan
+iki mesaj biçimidir. Tespit edilen **sayılar eski loglardan da gelebilir**;
+gerçek neden için ilgili oturum sırasında artışı izlenmelidir.
+
+Bu denetim hiçbir özel kaynak içeriğini veya sunucu log satırını dışarıya
+yazmaz; kaynakları **değiştirmez** ve native binary'yi yeniden derlemez.
+
 C++ test (g++ varsa):
 
 ```bash
