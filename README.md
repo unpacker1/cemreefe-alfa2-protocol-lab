@@ -49,6 +49,32 @@ Sadece ekranda çıkan **safeSnapshot + classification** sonucunu
 incele. Ham API cevabını GitHub'a **commit etme**. Bu modül gerçek
 native sokete bağlanmaz, şifre çözmez ve oyun hesabını değiştirmez.
 
+### GAME soketi EOF/oyundan atma tanısı (yalnız cihazda)
+
+Geliştirme laboratuvarı **DB/AUTH/GAME başlatmaz**. Orijinal
+Private GAME ve Alfa2 web sunucusu açıkken, ikinci Termux oturumunda:
+
+```bash
+cd ~/cemreefe_alfa2_public_lab
+git pull --ff-only
+
+python3 -m protocol_lab.game_exit \
+  --runtime "$HOME/CEMREEFE_NATIVE_STANDALONE/runtime"
+```
+
+İki ayrı sonuca bak:
+
+- `game_session_eof_listener_still_running`: GAME portu hâlâ açık;
+  tek bir karakter oturumu kapandı, **sebebi henüz kesin değil**.
+- `game_listener_stopped_after_eof`: GAME portu kapalı;
+  servis durmuş veya çökmüş olabilir.
+
+`localServerLogs.recentLogCategoryCounts` yalnız son 64 KB logdaki
+hata anahtar sözcüklerinin **adetlerini** gösterir. Ham satırlar,
+karakter ismi, şifre, IP, token ve paket verileri hiçbir şekilde
+çıktıya yazılmaz. Bu sayılar tek başına sunucunun gerçekten oyuncuyu
+attığını kanıtlamaz; daha ileri kaynak incelemesi Private yapılmalıdır.
+
 C++ test (g++ varsa):
 
 ```bash
