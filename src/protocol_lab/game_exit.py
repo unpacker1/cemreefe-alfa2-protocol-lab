@@ -17,9 +17,15 @@ from pathlib import Path
 from protocol_lab.triage import build_report
 
 CATEGORIES = {
+    "game_ping_no_pong": r"PING_EVENT\s*:\s*no\s+pong",
+    "game_pong_received": r"\bPONG!\s+\d+\s+\d+",
+    "game_sequence_mismatch": r"\bSEQUENCE\b[^\n]{0,160}\bmismatch\b",
+    "game_duplicate_login": r"(?:same\s*login|different\s*computer|duplicate\s*login|DisconnectOfSameLogin)",
+    "game_session_socket_closed": r"SYSTEM\s*:\s*closing\s+socket",
+    "game_handshake_rejected": r"(?:invalid\s+handshake|handshake\s+retry\s+limit)",
     "game_process_fault": r"(?:segmentation fault|sigsegv|core dumped|fatal error|abort(?:ed)?|assertion failed)",
     "game_disconnect": r"(?:disconnect|disconnected|connection closed|close socket|close desc|connection reset)",
-    "game_timeout": r"(?:timed?[\s_-]*out|no ping|ping timeout|heartbeat|keepalive)",
+    "game_timeout": r"(?:timed?[\s_-]*out|no ping|no pong|ping timeout|heartbeat|keepalive)",
     "game_login_reject": r"(?:login fail|invalid login|auth fail|wrong login|login key|duplicate login)",
     "game_security_reject": r"(?:speed.?hack|hack.?log|crc mismatch|invalid packet|sequence error|invalid header)",
     "game_shutdown": r"(?:shutdown|server stopped|quitting|terminat(?:ion|ed))",
@@ -59,7 +65,8 @@ def safe_log_counts(runtime):
     # Avoid recursive scans and path traversal. Only known local log slots.
     relative = (
         "logs/channel1_core1.out", "channel1_core1/syserr",
-        "channel1_core1/syslog", "logs/auth.out"
+        "channel1_core1/syslog", "logs/auth.out",
+        "channel1_core1/log/syslog", "channel1_core1/log/syserr"
     )
     counts = dict.fromkeys(CATEGORIES, 0)
     files_examined = 0
@@ -72,6 +79,7 @@ def safe_log_counts(runtime):
             counts[kind] += len(re.findall(expression, tail, re.IGNORECASE))
     return {"filesExamined": files_examined,
             "recentLogCategoryCounts": counts,
+            "logTailWindowBytesPerFile": 65536,
             "rawServerLogIncluded": False}
 
 
