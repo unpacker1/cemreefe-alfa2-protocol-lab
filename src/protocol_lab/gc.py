@@ -69,6 +69,24 @@ class IncrementalGCDecoder:
                 detail: dict[str, int | str] = {}
                 if op == 17 and len(self.buffer) >= 4 and self.buffer[1:4] != b"\x00" * 3:
                     raise self._bad("invalid_gc17_header", op)
+            elif op == 81:
+                # Synthetic compatibility for one published GAME fork:
+                # QUEST_INFO's flagged fields can be written after a
+                # six-byte header whose declared size remains six.
+                if len(self.buffer) < 6:
+                    break
+                declared = unpack_from("<H", self.buffer, 1)[0]
+                flags = self.buffer[5]
+                field_sizes = (1, 31, 17, 4, 17, 4, 25)
+                if flags & 0x80:
+                    raise self._bad("invalid_gc81_flags", op)
+                expected = 6 + sum(width for bit, width in
+                                   enumerate(field_sizes) if flags & (1 << bit))
+                if declared not in (6, expected):
+                    raise self._bad("invalid_gc81_length", op)
+                size = expected
+                detail = {"declared_size": declared,
+                          "flag": flags, "actual_size": expected}
             elif op in (115, 130):
                 head_length = 5 if op == 115 else 3
                 if len(self.buffer) < head_length:
