@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 from protocol_lab.game_exit import (
     classify_peer, inspect, safe_log_counts, safe_port_probe,
+    safe_keepalive_config, report_indicators,
 )
 
 
@@ -76,6 +77,50 @@ class SafeLocalGameExitTests(unittest.TestCase):
             self.assertEqual(info["recentLogCategoryCounts"]["game_duplicate_login"], 1)
             self.assertEqual(info["recentLogCategoryCounts"]["game_handshake_rejected"], 1)
             self.assertNotIn("SECRET_PLAYER", json.dumps(info))
+
+    def test_server_keepalive_config_only_numeric_value_exposed(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            game = root / "channel1_core1"
+            game.mkdir()
+            (game / "CONFIG").write_text(
+                "DB_PASSWORD: NO_PRIVATE_PASSWORD_MAY_LEAK\\n"
+                "ping_event_second_cycle: 60\\n".replace("\\\\n", "\\n"),
+                encoding="utf-8"
+            )
+            result = safe_keepalive_config(root)
+            self.assertEqual(result["serverPingIntervalSeconds"], 60)
+            self.assertEqual(result["heartbeatConfigSource"], "local_game_config")
+            self.assertNotIn("NO_PRIVATE_PASSWORD_MAY_LEAK", json.dumps(result))
+
+    def test_server_keepalive_missing_does_not_assume_default(self):
+        with tempfile.TemporaryDirectory() as temp:
+            result = safe_keepalive_config(temp)
+            self.assertIsNone(result["serverPingIntervalSeconds"])
+            self.assertEqual(result["heartbeatConfigSource"], "unavailable")
+
+    def test_server_keepalive_symlink_is_never_read(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            game = root / "channel1_core1"
+            game.mkdir()
+            secret = root / "conf_secret"
+            secret.write_text("ping_event_second_cycle: 90")
+            (game / "CONFIG").symlink_to(secret)
+            self.assertIsNone(safe_keepalive_config(root)["serverPingIntervalSeconds"])
+
+    def test_old_log_occurrences_only_return_uncorrelated_signals(self):
+        counts = {
+            "game_ping_no_pong": 1,
+            "game_sequence_mismatch": 1,
+            "game_duplicate_login": 0,
+            "game_process_fault": 0,
+            "game_handshake_rejected": 0,
+        }
+        signals = report_indicators(counts)
+        self.assertTrue(signals["possibleNoPongDisconnect"])
+        self.assertTrue(signals["possibleSequenceMismatch"])
+        self.assertFalse(signals["possibleDuplicateLogin"])
 
     def test_no_logs_have_no_invented_events(self):
         with tempfile.TemporaryDirectory() as temp:
