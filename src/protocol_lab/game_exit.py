@@ -74,6 +74,9 @@ def safe_log_counts(runtime):
         "logs/channel1_core1.out",
         "channel1_core1/stdout",
         "channel1_core1/stderr",
+        # Legacy/fork-specific plain files (not the staged symlinks).
+        "channel1_core1/log/syslog",
+        "channel1_core1/log/syserr",
         # AUTH may explain same-login disconnects; keep separate counts.
         "logs/auth.syslog.log",
         "logs/auth.syserr.log",
