@@ -1,0 +1,117 @@
+name: Public Classic Metin2 WebAssembly - Source Build
+
+on:
+  push:
+    branches:
+      - feature/classic-web-wasm-public-20261031
+  workflow_dispatch:
+
+# Public-source-only experiment. Never pull private repositories, player data or credentials.
+permissions:
+  contents: read
+
+jobs:
+  classic-wasm:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 100
+    env:
+      CEMREEFE_SHA: 4ac33651d49000de95e520e6de4373213dc54405
+      EMSDK_VERSION: 4.0.20
+    steps:
+      - name: Checkout isolated public branch
+        uses: actions/checkout@v4
+
+      - name: Install public build tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ninja-build cmake git python3
+          mkdir -p diagnostics
+          uname -a > diagnostics/environment.txt
+          cmake --version | head -n 1 >> diagnostics/environment.txt
+          python3 --version >> diagnostics/environment.txt
+
+      - name: Install pinned Emscripten SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/emscripten-core/emsdk.git /tmp/classic-emsdk
+          /tmp/classic-emsdk/emsdk install "${EMSDK_VERSION}"
+          /tmp/classic-emsdk/emsdk activate "${EMSDK_VERSION}"
+          source /tmp/classic-emsdk/emsdk_env.sh
+          emcc --version | head -n 2
+          emcc --version | head -n 2 >> diagnostics/environment.txt
+
+      - name: Fetch public, pinned Cemre Efe client C++ source and libraries
+        shell: bash
+        run: |
+          set -euo pipefail
+          git init -q upstream
+          git -C upstream remote add origin https://github.com/cemreefe/metin2-android.git
+          git -C upstream sparse-checkout init --cone
+          git -C upstream sparse-checkout set \
+            'r10dev.net OPENGL-ITJA/clientsource' \
+            'r10dev.net OPENGL-ITJA/web' \
+            'r10dev.net OPENGL-ITJA/Extern/include' \
+            'r10dev.net OPENGL-ITJA/Extern/lib/web' \
+            'r10dev.net OPENGL-ITJA/common' \
+            'third_party'
+          git -C upstream fetch --depth=1 --filter=blob:none origin "${CEMREEFE_SHA}"
+          git -C upstream checkout --detach FETCH_HEAD
+          test "$(git -C upstream rev-parse HEAD)" = "${CEMREEFE_SHA}"
+          git -C upstream submodule update --init --depth 1 third_party/OpenGr2ndma
+          ROOT='upstream/r10dev.net OPENGL-ITJA'
+          test -f "$ROOT/clientsource/CMakeLists.txt"
+          test -f "$ROOT/web/build.sh"
+          test -f "$ROOT/Extern/lib/web/libcryptopp.a"
+          test -f "$ROOT/Extern/lib/web/liblzo2.a"
+          test -f "$ROOT/Extern/lib/web/libpython2.7.a"
+          test -f "$ROOT/Extern/include/Python2-web/pyconfig.h"
+          test -f upstream/third_party/OpenGr2ndma/CMakeLists.txt
+          printf 'Cemre Efe commit: %s\n' "${CEMREEFE_SHA}" >> diagnostics/environment.txt
+          du -sh "$ROOT/clientsource" "$ROOT/Extern" upstream/third_party/OpenGr2ndma
+
+      - name: Verify Emscripten compiler with a minimal WASM
+        shell: bash
+        run: |
+          set -euo pipefail
+          source /tmp/classic-emsdk/emsdk_env.sh
+          printf '%s\n' 'int main(void) { return 0; }' > /tmp/classic-wasm-smoke.c
+          emcc /tmp/classic-wasm-smoke.c -o /tmp/classic-wasm-smoke.js
+          test -s /tmp/classic-wasm-smoke.wasm
+          echo 'EMSCRIPTEN_SMOKE=PASS' >> diagnostics/environment.txt
+
+      - name: Configure Cemre Efe classic WASM client (no original changes)
+        shell: bash
+        run: |
+          set -euo pipefail
+          source /tmp/classic-emsdk/emsdk_env.sh
+          SRC="$GITHUB_WORKSPACE/upstream/r10dev.net OPENGL-ITJA/clientsource"
+          emcmake cmake -S "$SRC" -B "$GITHUB_WORKSPACE/classic-web-build" \
+            -G Ninja -DM2_TARGET=web -DCMAKE_BUILD_TYPE=Release \
+            2>&1 | tee diagnostics/configure.log
+
+      - name: Build real classic WebAssembly client
+        shell: bash
+        run: |
+          set -euo pipefail
+          source /tmp/classic-emsdk/emsdk_env.sh
+          cmake --build classic-web-build --parallel 2 2>&1 | tee diagnostics/build.log
+          test -s classic-web-build/metin2_web.js
+          test -s classic-web-build/metin2_web.wasm
+          echo 'CLASSIC_WASM_BUILD=PASS' >> diagnostics/environment.txt
+          sha256sum classic-web-build/metin2_web.js classic-web-build/metin2_web.wasm \
+            > diagnostics/build-hashes.txt
+          ls -lh classic-web-build/metin2_web.js classic-web-build/metin2_web.wasm \
+            > diagnostics/build-sizes.txt
+
+      - name: Upload build evidence only (no game data or proprietary binaries)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-classic-web-build-evidence
+          path: |
+            diagnostics/
+          retention-days: 7
+          if-no-files-found: warn
