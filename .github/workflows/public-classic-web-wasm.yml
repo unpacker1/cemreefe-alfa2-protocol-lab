@@ -149,3 +149,115 @@ jobs:
             diagnostics/
           retention-days: 7
           if-no-files-found: warn
+
+
+  client-assets:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 100
+    env:
+      CEMREEFE_SHA: 4ac33651d49000de95e520e6de4373213dc54405
+      M2DEV_DATA_SHA: 98d2c1afb91cd5c1ef816de332e8b92141002bd4
+    steps:
+      - name: Public asset staging prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq python3-pil rsync patch libsodium23 liblzo2-2
+          mkdir -p diagnostics
+          echo "source mode: public code and public data only" > diagnostics/asset-stage.txt
+
+      - name: Fetch pinned public Cemre Efe data-staging tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          git init -q upstream-tools
+          git -C upstream-tools remote add origin https://github.com/cemreefe/metin2-android.git
+          git -C upstream-tools sparse-checkout init --cone
+          git -C upstream-tools sparse-checkout set \
+            'r10dev.net OPENGL-ITJA/android/tools' \
+            'r10dev.net OPENGL-ITJA/web'
+          git -C upstream-tools fetch --depth=1 --filter=blob:none origin "$CEMREEFE_SHA"
+          git -C upstream-tools checkout --detach FETCH_HEAD
+          test "$(git -C upstream-tools rev-parse HEAD)" = "$CEMREEFE_SHA"
+          test -f "upstream-tools/r10dev.net OPENGL-ITJA/android/tools/stage_client_data.sh"
+          test -f "upstream-tools/r10dev.net OPENGL-ITJA/web/pack.py"
+
+      - name: Fetch pinned M2Dev classic game data to temporary runner storage
+        shell: bash
+        run: |
+          set -euo pipefail
+          git init -q m2dev-client
+          git -C m2dev-client remote add origin https://github.com/d1str4ught/m2dev-client.git
+          git -C m2dev-client sparse-checkout init --cone
+          git -C m2dev-client sparse-checkout set assets bgm config
+          git -C m2dev-client fetch --depth=1 --filter=blob:none origin "$M2DEV_DATA_SHA"
+          git -C m2dev-client checkout --detach FETCH_HEAD
+          test "$(git -C m2dev-client rev-parse HEAD)" = "$M2DEV_DATA_SHA"
+          test -d m2dev-client/assets/root
+          test -f m2dev-client/assets/root/game.py
+          test -f m2dev-client/config/channel.inf
+          du -sh m2dev-client/assets | tee -a diagnostics/asset-stage.txt
+
+      - name: Stage public client data without modifying source repository
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The upstream stage script expects a top-level channel.inf and lib.
+          # These are missing in the M2Dev public checkout, so create them in
+          # the temporary runner checkout only; never commit staged assets.
+          cp m2dev-client/config/channel.inf m2dev-client/channel.inf
+          mkdir -p m2dev-client/lib
+          curl --fail --location --retry 3 --silent --show-error \
+            https://www.python.org/ftp/python/2.7.18/Python-2.7.18.tgz \
+            --output /tmp/Python-2.7.18.tgz
+          tar -xzf /tmp/Python-2.7.18.tgz -C /tmp Python-2.7.18/Lib
+          rsync -a --exclude=test --exclude=lib-tk --exclude=idlelib \
+            /tmp/Python-2.7.18/Lib/ m2dev-client/lib/
+          TOOLS="$GITHUB_WORKSPACE/upstream-tools/r10dev.net OPENGL-ITJA/android/tools"
+          bash "$TOOLS/stage_client_data.sh" \
+            "$GITHUB_WORKSPACE/m2dev-client" \
+            "$GITHUB_WORKSPACE/staged-client" en \
+            2>&1 | tee diagnostics/stage-client.log
+          test -f staged-client/game.py
+          test -d staged-client/locale
+          test -d staged-client/lib
+          du -sh staged-client | tee -a diagnostics/asset-stage.txt
+
+      - name: Create real client .m2pack bundles for online realm mode
+        shell: bash
+        run: |
+          set -euo pipefail
+          WEB="$GITHUB_WORKSPACE/upstream-tools/r10dev.net OPENGL-ITJA/web"
+          mkdir -p webroot
+          python3 "$WEB/pack.py" --data-dir staged-client --out webroot/client.m2pack \
+            --boot loose --boot lib/ --boot uiscript/ --boot locale/ \
+            --boot icon/ --boot fonts/ --boot "ymir work/ui/" \
+            --split-mb 150 --manifest webroot/packs.json --name client \
+            2>&1 | tee diagnostics/pack-client.log
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          m=json.loads(Path("webroot/packs.json").read_text())
+          c=m.get("client",{})
+          boot=c.get("boot")
+          parts=c.get("parts",[])
+          assert boot and parts, "missing actual boot bundle or asset parts"
+          required=[boot,*parts]
+          for e in required:
+              p=Path("webroot")/e["url"]
+              assert p.is_file() and p.stat().st_size>0, f"missing: {p}"
+          summary={"boot":boot,"parts":len(parts),
+                   "compressed_bytes":sum((Path("webroot")/e["url"]).stat().st_size for e in required)}
+          Path("diagnostics/pack-summary.json").write_text(json.dumps(summary,indent=2))
+          print("CLIENT_ASSETS_PACKED",json.dumps(summary))
+          PY
+
+      - name: Publish logs/metadata only, never game assets
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-classic-asset-stage-evidence
+          path: diagnostics/
+          if-no-files-found: warn
+          retention-days: 7
