@@ -55,6 +55,7 @@ jobs:
             'r10dev.net OPENGL-ITJA/web' \
             'r10dev.net OPENGL-ITJA/Extern/include' \
             'r10dev.net OPENGL-ITJA/Extern/lib/web' \
+            'r10dev.net OPENGL-ITJA/server/web' \
             'r10dev.net OPENGL-ITJA/common' \
             'third_party'
           git -C upstream fetch --depth=1 --filter=blob:none origin "${CEMREEFE_SHA}"
