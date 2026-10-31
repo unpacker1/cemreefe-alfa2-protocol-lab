@@ -83,6 +83,38 @@ jobs:
           test -s /tmp/classic-wasm-smoke.wasm
           echo 'EMSCRIPTEN_SMOKE=PASS' >> diagnostics/environment.txt
 
+      - name: Isolate unavailable Linux epoll APIs in legacy Python2 for wasm
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The pinned libpython2.7.a was built with Linux select.epoll symbols.
+          # Emscripten lacks Linux epoll. Fail these optional calls with ENOSYS
+          # instead of silently disabling all undefined-symbol checks.
+          # Original archives / C++ / Python libraries remain untouched.
+          cat > diagnostics/epoll_unavailable.c <<'EOF'
+          #include <errno.h>
+          struct epoll_event;
+          int epoll_create(int size) {
+              (void)size;
+              errno = ENOSYS;
+              return -1;
+          }
+          int epoll_ctl(int epfd, int op, int fd, struct epoll_event *ev) {
+              (void)epfd; (void)op; (void)fd; (void)ev;
+              errno = ENOSYS;
+              return -1;
+          }
+          int epoll_wait(int epfd, struct epoll_event *ev, int count, int timeout) {
+              (void)epfd; (void)ev; (void)count; (void)timeout;
+              errno = ENOSYS;
+              return -1;
+          }
+          EOF
+          source /tmp/classic-emsdk/emsdk_env.sh
+          emcc -c diagnostics/epoll_unavailable.c -o /tmp/epoll_unavailable.o
+          test -s /tmp/epoll_unavailable.o
+          echo 'EPOLL_COMPAT=explicit_ENOSYS_not_native_epoll' >> diagnostics/environment.txt
+
       - name: Configure Cemre Efe classic WASM client (no original changes)
         shell: bash
         run: |
@@ -91,6 +123,7 @@ jobs:
           SRC="$GITHUB_WORKSPACE/upstream/r10dev.net OPENGL-ITJA/clientsource"
           emcmake cmake -S "$SRC" -B "$GITHUB_WORKSPACE/classic-web-build" \
             -G Ninja -DM2_TARGET=web -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_EXE_LINKER_FLAGS=/tmp/epoll_unavailable.o \
             2>&1 | tee diagnostics/configure.log
 
       - name: Build real classic WebAssembly client
